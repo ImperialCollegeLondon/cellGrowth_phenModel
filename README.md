@@ -2,7 +2,7 @@
 Modelling and optimization of cell growth, based on imaging data
 
 ## source of the material
-Script produced and employed in the PhD Thesis: \n
+Script produced and employed in the PhD Thesis: \
 Title:      "Phenomenological modelling of the fission yeast cell cycle based on multi-dimensional single-cell phenotypic data across growth conditions" 
 Author:       Lorenzo Ficorella
 Institution:  Imperial College London
