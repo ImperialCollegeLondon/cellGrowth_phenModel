@@ -6,7 +6,7 @@ Script produced and employed in the PhD Thesis: \
 Title:      "Phenomenological modelling of the fission yeast cell cycle based on multi-dimensional single-cell phenotypic data across growth conditions" \
 Author:       Lorenzo Ficorella \
 Institution:  Imperial College London \
-date:         October 2018
+Subm. date:   October 2018
 
 ## functioning
 The functioning of the scripts is described in the aforementioned thesis. A link to the text will be provided as soon as it is available.\
