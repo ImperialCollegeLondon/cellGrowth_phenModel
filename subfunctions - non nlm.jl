@@ -70,10 +70,10 @@ end
   tDELTA  = tY[:,3];
 
   tY      .-= mean(tY,1)
-  tCovY    = tY'tY/(length(tDELTA)-1)
+  tCovY   = tY'tY/(length(tDELTA)-1)
   #tX 	  = inMat[:,[2,6]] # tX columns: raw, DNA
-  #tX      .-= mean(tX,1)
-  #tCovX    = tX'tX/(length(tINT)-1)
+  #tX     .-= mean(tX,1)
+  #tCovX  = tX'tX/(length(tINT)-1)
 
   #outVEC = zeros(24)
   outVEC = zeros(23)
@@ -171,7 +171,7 @@ end
   	temp1 = DNA_1_peak(1.0,		 parami[6],parami[3],Nph1[1])[:,1]
   	temp2 = DNA_1_peak(parami[5],parami[8],parami[3],Nph1[2])[:,1]
   	temp3 = DNA_1_peak(parami[4],parami[6],parami[3],Nph1[3])[:,1]
-	   fullCollect[fullInd.==1] = [temp1;temp2;temp3]
+	fullCollect[fullInd.==1] = [temp1;temp2;temp3]
     fullCollect[fullInd.==3] = DNA_1_peak(2.0,parami[7],parami[3],Nphs[2])[:,1]
     fullCollect[fullInd.==4] = DNA_1_peak(2.0,parami[7],parami[3],Nphs[3])[:,1]
 
@@ -246,11 +246,11 @@ end
 
 
   #MODELS
-  model_G1=vcat(Uniform(0,1),Uniform(0,1), Uniform(0,110000),Uniform(1,2),Uniform(2,4),  Uniform(0,1),Uniform(0,1),Uniform(0,1))
+  model_G1=vcat(Uniform(0,1),Uniform(0,1), Uniform(0,100000),Uniform(1,2),Uniform(2,4), Uniform(0,1),Uniform(0,1),Uniform(0,1))
   #parami: G1perc,Sperc(onNONG1), intN,inG2m,intSm,     Gxm_mu,G1b_mu,Sm_mu,
-  model_G2=vcat(Uniform(0,1),Uniform(0,1), Uniform(0,110000),Uniform(1,2),Uniform(2,4),  Uniform(0,1),Uniform(0,1),Uniform(0,1))
+  model_G2=vcat(Uniform(0,1),Uniform(0,1), Uniform(0,100000),Uniform(1,2),Uniform(2,4), Uniform(0,1),Uniform(0,1),Uniform(0,1))
   #parami: G1perc,Sperc(onNONG1), intN,intG1b,intSb,    G2m_mu,Gxb_mu,Sb_mu
-  model_S=vcat(Uniform(0,1), Uniform(0,1),	Uniform(0,110000),Uniform(0,1),Uniform(0,1), Uniform(0,1),Uniform(0,1),Uniform(0,1))
+  model_S =vcat(Uniform(0,1),Uniform(0,1), Uniform(0,100000),Uniform(0,1),Uniform(0,1), Uniform(0,1),Uniform(0,1),Uniform(0,1))
   #parami: G1perc,G2perc,         intN,intG2m,accrG1b,  G2m_mu,G1b_mu,Sx_mu
 
 

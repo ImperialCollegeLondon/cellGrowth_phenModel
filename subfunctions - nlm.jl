@@ -259,7 +259,7 @@ end
 
 #inputs: 1) nlm parameters of all elongating cell cycle stages; 2) %duration of non-elongating stages; 3) DNAint distribution parameters
 #output: DNA distribution parameters, for cell that divide in G2 phase
-@everywhere function nlm_DNA_G2(params::Vector{Float64},N::Int64,d0::Array{Float64,1}) #da modificare
+@everywhere function nlm_DNA_G2(params::Vector{Float64},N::Int64,d0::Array{Float64,1})
   # intG2m < intG1b < intG2b   < intSb;	intG2m==intG2b/2
   # intG2m < intG1b < 2*intG2m < intSb;
   # intG2m = 1; intG2b = 2;	intG1b=[1,2];	intSb=[2,4];
@@ -267,11 +267,11 @@ end
 
   intN = params[1]; intG1 = params[2]; intS = params[3];
   G1perc = params[4]; Sperc = params[5]*(1-G1perc)
-  if params[6]>0; dDNAph1 = Normal(1, params[6]);    	else; dDNAph1 = 1; 		end
-  if params[7]>0; dDNAph2 = Normal(intG1, params[7]);	else; dDNAph2 = intG1;	end
+  if params[6]>0; dDNAph1 = Normal(1, params[6]);    	else; dDNAph1 = 1;      end
+  if params[7]>0; dDNAph2 = Normal(intG1, params[7]);	else; dDNAph2 = intG1;  end
   dDNAph3 = dDNAph2;
-  if params[8]>0; dDNAph4 = Normal(intS, params[8]);	else; dDNAph4 = intS;	end
-  if params[7]>0; dDNAph5 = Normal(2, params[7]);		else; dDNAph2 = 2;		end
+  if params[8]>0; dDNAph4 = Normal(intS, params[8]);	else; dDNAph4 = intS;   end
+  if params[7]>0; dDNAph5 = Normal(2, params[7]);     else; dDNAph2 = 2;      end
 
   extPhsVec = round.(Int,d0)
   extPhsBin = binning(extPhsVec); extIntVec = zeros(Float64,length(extPhsVec))
@@ -302,26 +302,27 @@ end
 
   intN = params[1];	intG2 = params[2];	intS = params[3];
   aG1 = params[7];	bG1 = params[8];    nG1 = params[9];
-  aS  = params[10];	bS  = params[11];	nS  = params[12];
+  aS  = params[10];	bS  = params[11];	  nS  = params[12];
   aG1S = aG1*aS;    bG1S = aS*bG1+bS;   nG1S = aS*nG1+nS;
-  if nG1>0;      dG1=Normal(0.0, nG1*bG1/(2-aG1));        else; dG1=0.0;      end
-  if nG1S>0;     dG1S=Normal(0.0, nG1S*bG1S/(2-aG1S));    else; dG1S=0.0;     end
+  if nG1>0;     dG1 = Normal(0.0, nG1*bG1/(2-aG1));       else; dG1=0.0;      end
+  if nS>0;      dS  = Normal(0.0, nS*bS/(2-aS));          else; dS=0.0;       end
+  if nG1S>0;    dG1S= Normal(0.0, nG1S*bG1S/(2-aG1S));    else; dG1S=0.0;     end
 
-  if params[4]>0; dDNAph1 = Normal(1, params[4]);    	else; dDNAph1 = 1; 		end
-  if params[6]>0; dDNAph2 = Normal(intS, params[6]);  	else; dDNAph2 = intS;	end
-  if params[4]>0; dDNAph3 = Normal(intG2, params[4]);  	else; dDNAph3 = intG2;	end
-  if params[5]>0; dDNAph4 = Normal(2, params[5]);    	else; dDNAph4 = 2; 		end
+  if params[4]>0; dDNAph1 = Normal(1.0,  params[4]);    else; dDNAph1 = 1.0;    end
+  if params[6]>0; dDNAph2 = Normal(intS, params[6]);  	else; dDNAph2 = intS;   end
+  if params[4]>0; dDNAph3 = Normal(intG2,params[4]);  	else; dDNAph3 = intG2;	end
+  if params[5]>0; dDNAph4 = Normal(2.0,  params[5]);    else; dDNAph4 = 2.0; 		end
   dDNAph5 = dDNAph4;
 
 
   starts  = d0[:,1];  grs = d0[:,2];  raw = d0[:,3];  extPhsVec = round.(Int,d0[:,4])
   extPhsBin = binning(extPhsVec); extIntVec = zeros(Float64,length(extPhsVec))
   lenG1   = max.(aG1*starts + bG1 + rand(dG1),starts)
-  lenS    = max.(aG1S*starts + bG1S + rand(dG1S),starts)
+  lenS    = max.(aS*lenG1 + bS + rand(dS),lenG1)
 
   phs    = zeros(Int64,5)
   phs[1] = min(sum(raw.<=lenG1),extPhsBin[1])           #mononucleate, G1 phase
-  phs[2] = min(sum(raw.<=lenS),(extPhsBin[1]-phs[1]))   #mononucleate, S phase
+  phs[2] = min(sum(raw.<=lenS)-phs[1],(extPhsBin[1]-phs[1]))   #mononucleate, S phase
   phs[3] = extPhsBin[1] - phs[1] - phs[2]               #munonucleate, G2 phase
   phs[4] = extPhsBin[3];                                #binucleate, M phase
   phs[5] = extPhsBin[4];                                #binucleate, G1 phase
@@ -347,12 +348,12 @@ end
 
   intN = params[1]; intG2 = params[2]; intG1 = intG2+params[3]; G1perc = params[4];
   aS = params[8];   bS =params[9]
-  if params[10]>0; d1S=Normal(0.0, params[10]*bS/(2-aS)); else; d1S=0.0;      end
-  if params[7]>0; dDNAph1 = Normal(1,params[7]);		else; dDNAph1 = 1;		end
-  if params[5]>0; dDNAph2 = Normal(intG2,params[5]);	else; dDNAph2 = intG2;	end
-  if params[6]>0; dDNAph3 = Normal(intG1,params[6]);	else; dDNAph3 = intG1;	end
+  if params[10]>0;  d1S=Normal(0.0, params[10]*bS/(2-aS)); else; d1S=0.0;       end
+  if params[7]>0;   dDNAph1 = Normal(1.0,params[7]);	  else; dDNAph1 = 1.0;		end
+  if params[5]>0;   dDNAph2 = Normal(intG2,params[5]);	else; dDNAph2 = intG2;	end
+  if params[6]>0;   dDNAph3 = Normal(intG1,params[6]);	else; dDNAph3 = intG1;	end
   dDNAph4 = dDNAph3;
-  if params[7]>0; dDNAph5 = Normal(2,params[7]);		else; dDNAph5 = 2;		end
+  if params[7]>0;   dDNAph5 = Normal(2.0,params[7]);	  else; dDNAph5 = 2.0;		end
 
   starts  = d0[:,1];  grs = d0[:,2];  raw = d0[:,3];  extPhsVec = round.(Int,d0[:,4])
   extPhsBin = binning(extPhsVec); extIntVec = zeros(Float64,length(extPhsVec))
@@ -366,8 +367,8 @@ end
   phs[5] = extPhsBin[4] - phs[4]              #binucleate, S phase (bef div)
 
   temp1=[]; temp2=[]; temp4=[]; temp5=[];
-  if phs[1]!=0;	temp1= rand(dDNAph1, phs[1]);	end
-  if phs[2]!=0; temp2= rand(dDNAph2, phs[2]);	end
+  if phs[1]!=0;	temp1= rand(dDNAph1, phs[1]);	  end
+  if phs[2]!=0; temp2= rand(dDNAph2, phs[2]);	  end
   if phs[4]!=0; temp4= rand(dDNAph4, phs[4]); 	end
   if phs[5]!=0; temp5= rand(dDNAph5, phs[5]); 	end
   if phs[3]!=0; extIntVec[extPhsVec.==3] = rand(dDNAph3,phs[3]);    end

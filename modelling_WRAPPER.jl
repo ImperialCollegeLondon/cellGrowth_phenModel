@@ -18,13 +18,13 @@
 genRoot   = "general path to models, data and results"
 scriptRoot= "path to models"
 fileRoot  = "path to data folder"
-inputLeaf = "path to specific file"
 
-dyeCycle  = [0.07,0.5,1.5,2.5]  #from OD measurements during timecourse    #dyeCycle[1] must be greater than 0! (ideally, >0.01)
-extTP     = [3,6,10,13]         #timepoints to be employed (if starting from real data)
+#extTP      = [3,6,10,13,1]      #external inputs:  timepoints to be employed (if starting from real data) and experiment
+#extSim     = 15000              #external inputs:  agents (cells) to be modelled (Inf for using the cells numbers as in exp. data)
 startFrom = 0                   #-1=synth data; 0=exp data, no steps done; 1=optimization performed
+dyeCycle  = [0.07,0.5,1.5,2.5]  #from OD measurements during timecourse    #dyeCycle[1] must be greater than 0! (ideally, >0.01)
 runPars   = [30,0.01]           #number of cell cycles, time step in cell cyles
-techPars  = [0.045,0.01,2.2]    #unstained at t0; %error in classification; corrective factor for Δdye calculation
+techPars  = [0.045,0.01,1.0]    #unstained at t0; %error in classification; corrective factor for Δdye calculation
 
 #initializing all possible cores for parallelising runs
 cd(genRoot*scriptRoot)
@@ -79,10 +79,14 @@ if startFrom<0  #create synthetic data using noisy linear map
   end
   resFoldRoot = "Results\\";  resFileRoot = "run_"*lpad(sample(1:999999),6,0)*"_"
   outRoot     = resFoldRoot*resFileRoot
-  writedlm(outRoot*"parameters.txt", [genPars;dyeCycle;DNApars;DNAphases])
+  DNApars_ext = [DNApars[1:4];0;DNApars[5:7]];  DNAphases_ext = [0;0;0;DNAphases;0;0;0]
+  writedlm(outRoot*"parameters.txt", [genPars;dyeCycle;DNApars_ext;DNAphases_ext;8;"S"])
+  #this is only valid for that specific model; if other models are used, it should be changed accordingly
 
 else            #files loading
   inputRoot   = genRoot*fileRoot
+  allLeaves   = readdir(inputRoot)
+  inputLeaf   = allLeaves[extTP[5]]
   indexVec    = [8,2,9,18,21,13]  #dyeD,rawL,dyeR,ccPhase,unstInd,DNAint
   fullMat0    = readdlm(inputRoot*inputLeaf,',',header=true)
   importFeatName = fullMat0[2]
@@ -91,14 +95,17 @@ else            #files loading
   fullMat0[fullMat0[:,18].>2,13]  = 2*fullMat0[fullMat0[:,18].>2,13]  #se cellule binucleate, semplicemente raddoppio l'intensità nucleare
   fullMat0[:,21]  = 0; fullMat0[fullMat0[:,9].==0,21] = 1;            #uniformo unstained check esterni a quelli richiesti per il modello
   fullMat0[:,end] = parse.(Int64,replace.(fullMat0[:,end],"t",""));   #necessario per dividere in timepoints
+  ODstart     = unique(fullMat0[fullMat0[:,end].==1,20])[1];
   fullMat     = Array{Array{Float64, 2}}(4)
-  fullMat[1]  = fullMat0[fullMat0[:,end].==extTP[1],indexVec];  dyeCycle[1] = unique(fullMat0[fullMat0[:,end].==extTP[1],20])[1];
-  fullMat[2]  = fullMat0[fullMat0[:,end].==extTP[2],indexVec];  dyeCycle[2] = unique(fullMat0[fullMat0[:,end].==extTP[2],20])[1];
-  fullMat[3]  = fullMat0[fullMat0[:,end].==extTP[3],indexVec];  dyeCycle[3] = unique(fullMat0[fullMat0[:,end].==extTP[3],20])[1];
-  fullMat[4]  = fullMat0[fullMat0[:,end].==extTP[4],indexVec];  dyeCycle[4] = unique(fullMat0[fullMat0[:,end].==extTP[4],20])[1];
+  fullMat[1]  = fullMat0[fullMat0[:,end].==extTP[1],indexVec];  dyeCycle[1] = log2(unique(fullMat0[fullMat0[:,end].==extTP[1],20])[1]/ODstart);
+  fullMat[2]  = fullMat0[fullMat0[:,end].==extTP[2],indexVec];  dyeCycle[2] = log2(unique(fullMat0[fullMat0[:,end].==extTP[2],20])[1]/ODstart);
+  fullMat[3]  = fullMat0[fullMat0[:,end].==extTP[3],indexVec];  dyeCycle[3] = log2(unique(fullMat0[fullMat0[:,end].==extTP[3],20])[1]/ODstart);
+  fullMat[4]  = fullMat0[fullMat0[:,end].==extTP[4],indexVec];  dyeCycle[4] = log2(unique(fullMat0[fullMat0[:,end].==extTP[4],20])[1]/ODstart);
 
-  outRoot     = "Results\\"*inputLeaf*"_run_"*lpad(sample(1:999),3,0)
-  simPars     = Vector{Real}(3);  simPars[1] = size(fullMat[3])[1]; simPars[2:3] = runPars
+  resFoldRoot = "Results\\";    resFileRoot = inputLeaf*"_run_"*lpad(sample(1:999),3,0);
+  outRoot     = resFoldRoot*resFileRoot
+  simPars     = Vector{Real}(3);  simPars[2:3] = runPars
+  if extSim == Inf; simPars[1] = size(fullMat[3])[1];   else;   simPars[1] = extSim;    end
 end
 extPars     = [simPars;techPars]
 extPars[5]  = ceil(Int,extPars[1]*extPars[5])
@@ -118,7 +125,6 @@ expd_END[4] = sample(1:extPars[1],2*extPars[5],replace=false)
 ###############################################
 ###############################################
 ###PART 5:  FINDING OUT THE PHASE
-#AT THE MOMENT, THE SYNTHETIC GENERATION IS SET TO GENERATE POPULATIONS DIVIDING IN S PHASE
 
 expd_DNA        = Array{Any}(3)
 expd_DNA[1]     = Array{Array{Float64,1}}(2)
@@ -126,29 +132,30 @@ expd_DNA[1][1]  = vec(expd_TAB[1][1:3,16:20]')
 expd_DNA[1][2]  = vec(expd_TAB[2][1:3,16:20]')
 expd_DNA[2]     = extPars
 expd_DNA[3]     = round.(Int,extPars[1]*expd_TAB[1][1:3,25])
+expd_DNA[3][3]  = extPars[1]-sum(expd_DNA[3][1:2])
 if startFrom<1
   phase_sel     = phase_detect(expd_DNA)
   writedlm(outRoot*"divPhase.txt",phase_sel)
 else
-  phase_sel      = readdlm(outRoot*"divPhase.txt")
+  phase_sel     = readdlm(outRoot*"divPhase.txt")
 end
 
 if      phase_sel == "G1"
-    partMod_DNA = Uniform.([0.0,1.01,2.01, 0.0,0.0,0.0],[110000,2.0,4.0, 1.0,1.0,1.0])
+    partMod_DNA = Uniform.([0.0,1.01,2.01, 0.0,0.0,0.0],[10000,2.0,4.0, 1.0,1.0,1.0])
     partMod_phS = Uniform.(0.0,[2.0,20.0,1.0,2.0,20.0,1.0])
     # 19:24   IntN,intG2m,intSm, μGxm,μG1b,μSm, aG1,bG1,μG1, aS,bS,μS
     @everywhere nlm_DNA_ch = nlm_DNA_G1SG2
     expd_END[3] = [6,7,2,4]
     prioriMode  = 3
 elseif  phase_sel == "S"
-    partMod_DNA = Uniform.([0.0,0.0,0.0, 0.0, 0.0,0.0,0.0],[110000.0,1.0,1.0, 1.0, 1.0,1.0,1.0])
+    partMod_DNA = Uniform.([0.0,0.0,0.0, 0.0, 0.0,0.0,0.0],[10000.0,1.0,1.0, 1.0, 1.0,1.0,1.0])
     partMod_phS = Uniform.(0.0,[2.0,20.0,1.0])
     # 19:25   intN,intG2m,accrG1b, G1%, μG2m,μG1b,μSx, aS,bS,muS
     @everywhere nlm_DNA_ch = nlm_DNA_SG2
     expd_END[3] = [6,7,2,4]
     prioriMode  = 2
 elseif  phase_sel == "G2"
-    partMod_DNA = Uniform.([0.0,1.01,2.01, 0.0,0.0, 0.0,0.0,0.0],[110000.0,2.0,4.0, 1.0,1.0, 1.0,1.0,1.0])
+    partMod_DNA = Uniform.([0.0,1.01,2.01, 0.0,0.0, 0.0,0.0,0.0],[10000.0,2.0,4.0, 1.0,1.0, 1.0,1.0,1.0])
     # 19:26   intN,intG1b,intSb, G1%,S%(nonG1), μG2m,μGxb,μSb
     partMod_phS = []
     @everywhere nlm_DNA_ch = nlm_DNA_G2
@@ -401,13 +408,13 @@ if startFrom<1
   test_lens = 0.0; #it must be a Float64 number!
   while any(pn.<=0)
     Nrun += 1
-    test_lens=APMC(800,expd_END,model_END,0.5,rho_END,0.001,2, prioriMode, test_lens)
+    test_lens=APMC(1600,expd_END,model_END,0.5,rho_END,0.001,2, prioriMode, test_lens)
     backup = deepcopy(test_lens)  #only for testing purposes
     pn = map(y->size(y)[2],test_lens.pts[:,end]);
     mod_acc = sum(pn.>0); mod_ind = mod_ind[pn.>0]; mod_names = mod_names[pn.>0]
     writedlm(outRoot*"test5_winner1_run"*string(Nrun)*".txt",[mod_names])
 
-    keepInd = find(pn.>0);    # diffVal = diff(keepInd); attempted correction, to be tested
+    keepInd = find(pn.>0);
     diffVal=diff([0;keepInd]);  diffInd = find(diffVal.>1);   diffVal = diffVal[diffInd]-1
     model_END       = model_END[keepInd]
     rho_END         = rho_END[keepInd]
@@ -437,14 +444,18 @@ if startFrom<1
     foundPars_STR[i] = test_lens.pts[i,end]
     writedlm(outRoot*"test5_pars_"*mod_names[i]*".txt",foundPars_STR[i])
   end
+  modelWeiMax = indmax(test_lens.p[:,end]);
+  modelPopMax = indmax(pn);
 else
   fileIndex = readdir(resFoldRoot)
   fileIndex = fileIndex[contains.(fileIndex,resFileRoot*"test5_pars_")]
   mod_acc   = length(fileIndex)
   foundPars_STR = Vector{Array{Float64,2}}(mod_acc)
   for i in 1:mod_acc; foundPars_STR[i] = readdlm(resFoldRoot*fileIndex[i]);  end
-  pn = map(y->size(y)[2],foundPars_STR[:,end]);
-  mod_ind = Int64.(readdlm(outRoot*"test5_winner1_end.txt"))
+  inputMod    = readdlm(outRoot*"test5_winner1_end.txt")
+  modelWeiMax = indmax(inputMod[:,2])
+  modelPopMax = indmax(inputMod[:,3])
+  mod_ind     = Int64.(inputMod[:,1])
 end
 
 foundPars_TAB = similar(foundPars_STR)
@@ -465,48 +476,56 @@ end
 ###############################################
 ###PART 9: CREATING THE FINAL SET OF PARAMETERS
 
-#pn = pn[pn.>1];
-#foundPars_VEC = foundPars_TAB[indmax(pn)]; mod_ind=mod_ind[indmax(pn)]
-foundPars_VEC = foundPars_TAB[indmax(test_lens.p[:,end])]; mod_ind=mod_ind[indmax(test_lens.p[:,end])]
+foundPars_VEC = foundPars_TAB[modelWeiMax]; mod_ind=mod_ind[modelWeiMax]
 winMod = repmat([mod_ind],1,size(foundPars_VEC)[2]);
 winPhs = repmat([phase_sel],1,size(foundPars_VEC)[2]);
 
-if      phase_sel == "G1"
-  G1S_a = foundPars_VEC[end-2].*foundPars_VEC[end-5,:]
-  G1S_b = foundPars_VEC[end-2,:].*foundPars_VEC[end-4,:] + foundPars_VEC[end-1,:]
-  G1S_m = foundPars_VEC[end-2,:].*foundPars_VEC[end-3,:] + foundPars_VEC[end,:]
-  G2_a  = foundPars_VEC[1,:]./G1S_a;
-  G2_b  = foundPars_VEC[2,:] - G2_a.*G1S_b;
-  G2_m  = foundPars_VEC[3,:] - G2_a.*G1S_m;
-  finalSet  = vcat(foundPars_VEC, G2_a',G2_b',G2_m', winMod,winPhs)
-elseif  phase_sel == "S"
-  G2_a = foundPars_VEC[1,:]./foundPars_VEC[end-2,:];
-  G2_b = foundPars_VEC[2,:] - G2_a.*foundPars_VEC[end-1,:];
-  G2_m = foundPars_VEC[3,:] - G2_a.*foundPars_VEC[end,:];
-  finalSet  = vcat(foundPars_VEC, G2_a',G2_b',G2_m', winMod,winPhs)
-elseif  phase_sel == "G2"
-  finalSet  = vcat(foundPars_VEC,winMod,winPhs)
+tempInd = [3,4,7,8]
+finalSet = zeros(18,2);
+if      iszero(mod(mod_ind,2)) & any(tempInd.==mod_ind)
+  finalSet[[1:6;8:18],:] = foundPars_VEC[1:17,:];         tE=17;
+elseif  iszero(mod(mod_ind,2)) & !any(tempInd.==mod_ind)
+  finalSet[[1:6;8:12;15:18],:] = foundPars_VEC[1:15,:];   tE=15;
+elseif  !iszero(mod(mod_ind,2)) & any(tempInd.==mod_ind)
+  finalSet[1:18,:] = foundPars_VEC[1:18,:];               tE=18;
+elseif  !iszero(mod(mod_ind,2)) & !any(tempInd.==mod_ind)
+  finalSet[[1:12;15:18],:] = foundPars_VEC[1:16,:];       tE=16;
 end
 
-if iszero(mod(mod_ind,2));  finalSet = [finalSet[1:6,:];[0 0];finalSet[7:end,:]]; end
-writedlm(outRoot*"finalPars.txt",finalSet)
-# 1:5         αT,βT,μT, ϴ,γ
-# 6:9         αNonEl_mit,βNonEl_mit, αNonEl_post,βNonEl_post
-# 10:12       netoTa, netoTb,netoR
-# (13:14      %smaller pop,% rate smaller pop)
-# 15:18       t1,t07,t10,t12
-#if      phase_sel == "G1"
-  # 19:24   IntN,intG2m,intSm, Gxm_mu,G1b_mu,Sm_mu
-  # 25:33   αG1,βG1,μG1, αS,βS,μS, αG2,βG2,μG2
-#elseif  phase_sel == "S"
-  # 19:25   intN,intG2m,accrG1b, G1perc, G2m_mu,G1b_mu,Sx_mu
-  # 26:31   αS,βS,μS, αG2,βG2,μG2
-#elseif  phase_sel == "G2"
-  # 19:26   intN,intG1b,intSb, G1perc,Sperc(onNONG1), G2m_mu,Gxb_mu,Sb_mu
-#end
-# end-1:end   winning_model, winning_phase
+finalDNA = zeros(17,2);
+if      phase_sel == "G1"
+    G1S_a = foundPars_VEC[end-2,:].*foundPars_VEC[end-5,:]
+    G1S_b = foundPars_VEC[end-2,:].*foundPars_VEC[end-4,:] + foundPars_VEC[end-1,:]
+    G1S_m = foundPars_VEC[end-2,:].*foundPars_VEC[end-3,:] + foundPars_VEC[end,:]
+    G2_a  = foundPars_VEC[1,:]./G1S_a;
+    G2_b  = foundPars_VEC[2,:] - G2_a.*G1S_b;
+    G2_m  = foundPars_VEC[3,:] - G2_a.*G1S_m;
+    finalDNA[1:3,:]    = foundPars_VEC[(tE+1):(tE+3),:]      #intensities
+    finalDNA[6:8,:]    = foundPars_VEC[(tE+4):(tE+6),:]      #noise
+    finalDNA[9:14,:]   = foundPars_VEC[(tE+7):(tE+12),:]     #nlm pars
+    finalDNA[15:17,:]  = vcat(G2_a',G2_b',G2_m')
+elseif  phase_sel == "S"
+    G2_a = foundPars_VEC[1,:]./foundPars_VEC[end-2,:];
+    G2_b = foundPars_VEC[2,:] - G2_a.*foundPars_VEC[end-1,:];
+    G2_m = foundPars_VEC[3,:] - G2_a.*foundPars_VEC[end,:];
+    finalDNA[1:3,:]    = foundPars_VEC[(tE+1):(tE+3),:]     #intensities
+    finalDNA[4,:]      = foundPars_VEC[(tE+4),:]            #percentages
+    finalDNA[6:8,:]    = foundPars_VEC[(tE+5):(tE+7),:]     #noise
+    finalDNA[12:14,:]   = foundPars_VEC[(tE+8):(tE+10),:]   #nlm pars
+    finalDNA[15:17,:]  = vcat(G2_a',G2_b',G2_m')
+elseif  phase_sel == "G2"
+    finalDNA[1:3,:]    = foundPars_VEC[(tE+1):(tE+3),:]      #intensities
+    finalDNA[4:5,:]    = foundPars_VEC[(tE+4):(tE+5),:]      #percentages
+    finalDNA[6:8,:]    = foundPars_VEC[(tE+6):(tE+8),:]      #noise
+end
 
-#to compare:
-#setST = [genPars;dyeCycle;DNApars;DNAphases];
-#setEN = finalSet[1:length(setST),:];
-#setAL = hcat(setST,setEN);
+finalMix = vcat(finalSet, finalDNA, winMod,winPhs)
+writedlm(outRoot*"finalPars.txt",finalMix)
+# 1:5       αT,βT,μT, ϴ,γ
+# 6:9       αNonEl_mit,βNonEl_mit, αNonEl_post,βNonEl_post
+# 10:12     netoTa, netoTb,netoR
+# 13:14     %smaller pop,% rate smaller pop
+# 15:18     t1,t07,t10,t12
+# 19:26     IntN,intR1,intR2, G1perc,Sperc(onNONG1), μ1,μ2,μ3
+# 27:35     aG1,bG1,μG1, aS,bS,μS, αG2,βG2,μG2
+# 36:37     winning_model, winning_phase
